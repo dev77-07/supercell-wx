@@ -184,9 +184,9 @@ public:
    void RunMousePicking();
    void ScreenCaptureCopy();
    void ScreenCaptureSaveImage();
-   void SelectNearestRadarSite(double                     latitude,
-                               double                     longitude,
-                               std::optional<std::string> type);
+   void SelectNearestRadarSite(double                          latitude,
+                               double                          longitude,
+                               std::optional<types::RadarType> type);
    void SetRadarSite(const std::string& radarSite,
                      bool               checkProductAvailability = false);
    void UpdateColorTable(const std::string& colorPalette);
@@ -1157,12 +1157,12 @@ void MapWidget::SetMapLocation(double latitude,
          auto& generalSettings = settings::GeneralSettings::Instance();
 
          // Find the nearest radar
-         std::optional<std::string> type = std::nullopt;
+         std::optional<types::RadarType> type = std::nullopt;
 
          if (generalSettings.auto_navigate_to_wsr88d_only().GetValue())
          {
             // Find the nearest WSR-88D radar
-            type = "wsr88d";
+            type = types::RadarType::WSR88D;
          }
 
          // Find the nearest radar
@@ -1598,12 +1598,12 @@ void MapWidget::mousePressEvent(QMouseEvent* ev)
          auto& generalSettings = settings::GeneralSettings::Instance();
 
          // Select nearest radar on middle click
-         std::optional<std::string> type = std::nullopt;
+         std::optional<types::RadarType> type = std::nullopt;
 
          if (generalSettings.auto_navigate_to_wsr88d_only().GetValue())
          {
             // Select nearest WSR-88D radar on middle click
-            type = "wsr88d";
+            type = types::RadarType::WSR88D;
          }
 
          auto coordinate = p->map_->coordinateForPixel(p->lastPos_);
@@ -2349,11 +2349,12 @@ void MapWidgetImpl::ScreenCaptureSaveImage()
       });
 }
 
-void MapWidgetImpl::SelectNearestRadarSite(double                     latitude,
-                                           double                     longitude,
-                                           std::optional<std::string> type)
+void MapWidgetImpl::SelectNearestRadarSite(double latitude,
+                                           double longitude,
+                                           std::optional<types::RadarType> type)
 {
-   auto radarSite = config::RadarSite::FindNearest(latitude, longitude, type);
+   const auto radarSite =
+      config::RadarSite::FindNearest(latitude, longitude, type);
 
    if (radarSite != nullptr)
    {

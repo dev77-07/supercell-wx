@@ -102,9 +102,9 @@ RadarSite::~RadarSite() = default;
 RadarSite::RadarSite(RadarSite&&) noexcept            = default;
 RadarSite& RadarSite::operator=(RadarSite&&) noexcept = default;
 
-std::string RadarSite::type() const
+types::RadarType RadarSite::type() const
 {
-   return types::GetRadarTypeName(p->type_);
+   return p->type_;
 }
 
 std::string RadarSite::type_name() const
@@ -231,7 +231,7 @@ std::vector<std::shared_ptr<RadarSite>> RadarSite::GetAll()
 }
 
 std::shared_ptr<RadarSite> RadarSite::FindNearest(
-   double latitude, double longitude, const std::optional<std::string>& type)
+   double latitude, double longitude, std::optional<types::RadarType> type)
 {
    std::shared_lock lock(siteMutex_);
 
@@ -243,7 +243,7 @@ std::shared_ptr<RadarSite> RadarSite::FindNearest(
    for (const auto& radarSite : radarSiteList_)
    {
       // If the type filter doesn't match, skip
-      if (type.has_value() && radarSite->type() != type)
+      if (type.has_value() && radarSite->type() != *type)
       {
          continue;
       }

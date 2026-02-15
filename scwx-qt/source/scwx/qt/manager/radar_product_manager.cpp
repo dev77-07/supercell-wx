@@ -487,16 +487,16 @@ const scwx::util::time_zone* RadarProductManager::default_time_zone() const
    }
 }
 
-bool RadarProductManager::is_tdwr() const
+types::RadarType RadarProductManager::radar_type() const
 {
-   return p->radarSite_->type() == "tdwr";
+   return p->radarSite_->type();
 }
 
 float RadarProductManager::gate_size() const
 {
    // tdwr is 150 meter per gate, wsr88d is 250 meter per gate
    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
-   return (is_tdwr()) ? 150.0f : 250.0f;
+   return (radar_type() == types::RadarType::TDWR) ? 150.0f : 250.0f;
 }
 
 std::optional<float> RadarProductManager::incoming_level_2_elevation() const
@@ -525,7 +525,7 @@ void RadarProductManager::Initialize()
 
    logger_->debug("Initialize()");
 
-   if (is_tdwr())
+   if (radar_type() != types::RadarType::WSR88D)
    {
       p->initialized_ = true;
       return;
