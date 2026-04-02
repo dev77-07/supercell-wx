@@ -968,8 +968,10 @@ RadarProductManager::GetActiveVolumeTimes(
       {
          const auto dates =
             provider->IsDateArchiveAvailable() ?
-               std::initializer_list {yesterday, today, tomorrow} :
-               std::initializer_list {today};
+               std::initializer_list<std::chrono::system_clock::time_point> {
+                  yesterday, today, tomorrow} :
+               std::initializer_list<std::chrono::system_clock::time_point> {
+                  today};
 
          // For yesterday, today and tomorrow (in parallel)
          std::for_each(
@@ -1271,9 +1273,11 @@ bool RadarProductManagerImpl::AreProductTimesPopulated(
 
    const auto yesterday = today - std::chrono::days {1};
    const auto tomorrow  = today + std::chrono::days {1};
-   const auto dates     = providerManager->provider_->IsDateArchiveAvailable() ?
-                             std::initializer_list {yesterday, today, tomorrow} :
-                             std::initializer_list {today};
+   const auto dates =
+      providerManager->provider_->IsDateArchiveAvailable() ?
+         std::initializer_list<std::chrono::system_clock::time_point> {
+            yesterday, today, tomorrow} :
+         std::initializer_list<std::chrono::system_clock::time_point> {today};
 
    for (auto& date : dates)
    {
@@ -1359,9 +1363,11 @@ void RadarProductManagerImpl::PopulateProductTimes(
 
    const auto yesterday = today - std::chrono::days {1};
    const auto tomorrow  = today + std::chrono::days {1};
-   const auto dates     = providerManager->provider_->IsDateArchiveAvailable() ?
-                             std::initializer_list {yesterday, today, tomorrow} :
-                             std::initializer_list {today};
+   const auto dates =
+      providerManager->provider_->IsDateArchiveAvailable() ?
+         std::initializer_list<std::chrono::system_clock::time_point> {
+            yesterday, today, tomorrow} :
+         std::initializer_list<std::chrono::system_clock::time_point> {today};
 
    std::set<std::chrono::system_clock::time_point> volumeTimes {};
    std::mutex                                      volumeTimesMutex {};
