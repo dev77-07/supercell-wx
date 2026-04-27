@@ -118,8 +118,7 @@ NexradDataProviderFactory::CreateLevel3DataProvider(
             boost::istarts_with(baseUri, kHttpsPrefix_))
    {
       // HTTP-based provider not implemented yet
-      // provider = std::make_unique<HttpLevel3DataProvider>(radarSite,
-      // product, baseUri);
+      provider = std::make_unique<OndasLevel3DataProvider>(radarSite, product, baseUri);
    }
    else
    {
