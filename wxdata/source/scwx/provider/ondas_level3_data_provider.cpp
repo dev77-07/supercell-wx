@@ -162,7 +162,7 @@ std::string OndasLevel3DataProvider::GetListingUrl(
 
    // ONDAS directory listing URL format is:
    // {baseUri}/{radarSite}/{product}/dir.list
-   return fmt::format("{0}/{1}/{2}/dir.list", p->baseUri_, , p->product_, p->radarSite_);
+   return fmt::format("{0}/{1}/{2}/dir.list", p->baseUri_, p->radarSite_, p->product_);
 }
 
 std::string OndasLevel3DataProvider::GetFileUrl(const std::string& key)
