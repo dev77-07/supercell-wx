@@ -133,7 +133,6 @@ OndasLevel3DataProvider::ListObjects(std::chrono::system_clock::time_point date)
 
    for (const auto& record : records)
    {
-      logger_->debug("Record: {}", record.filename_);
       const auto time = GetTimePointFromKey(record.filename_);
       if (time == std::chrono::system_clock::time_point {})
       {
