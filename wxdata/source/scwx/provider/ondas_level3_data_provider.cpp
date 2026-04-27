@@ -15,10 +15,10 @@ static const std::string logPrefix_ =
    "scwx::provider::ondas_level3_data_provider";
 static const auto logger_ = util::Logger::Create(logPrefix_);
 
-class OndasLevel2DataProvider::Impl
+class OndasLevel3DataProvider::Impl
 {
 public:
-   explicit Impl(OndasLevel2DataProvider* self,
+   explicit Impl(OndasLevel3DataProvider* self,
                  std::string              radarSite,
                  std::string              product,
                  std::string              baseUri) :
