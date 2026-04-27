@@ -39,25 +39,6 @@ jobs:
             conan_profile: scwx-windows_vs2022_x64
             appimage_arch: ''
             artifact_suffix: windows-vs2022-x64
-          - name: windows_vs2026_x64
-            os: windows-2025-vs2026
-            build_type: Release
-            env_cc: ''
-            env_cxx: ''
-            compiler: msvc
-            cppflags: ''
-            ldflags: ''
-            vs_arch: x64
-            vs_version: 18
-            qt_version: 6.11.0
-            qt_arch_aqt: win64_msvc2022_64
-            qt_arch_dir: msvc2022_64
-            qt_modules: qtimageformats qtmultimedia qtpositioning qtserialport
-            qt_tools: ''
-            conan_package_manager: ''
-            conan_profile: scwx-windows_vs2026_x64
-            appimage_arch: ''
-            artifact_suffix: windows-vs2026-x64
 
     name: ${{ matrix.name }}
     env:
