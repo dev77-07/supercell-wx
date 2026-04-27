@@ -96,56 +96,71 @@ GraphicProductMessage::tabular_block() const
 
 bool GraphicProductMessage::Parse(std::istream& is)
 {
-   bool dataValid = true;
+    bool dataValid = true;
 
-   const std::streampos dataStart = is.tellg();
+    // 1. Skip WMO Header: Move to the actual start of the binary message
+    // Most NEXRAD files start with "SDUS". We skip until we hit binary data.
+    char peek;
+    while ((peek = is.peek()) != EOF && !std::isdigit(peek) && peek != 0x78 && peek != 0x42)
+    {
+        is.ignore(1);
+    }
 
-   p->descriptionBlock_ = std::make_shared<ProductDescriptionBlock>();
-   dataValid            = p->descriptionBlock_->Parse(is);
+    const std::streampos dataStart = is.tellg();
 
-   if (dataValid)
-   {
-      if (p->descriptionBlock_->IsCompressionEnabled())
-      {
-         size_t messageLength = header().length_of_message();
-         size_t prefixLength =
-            Level3MessageHeader::SIZE + ProductDescriptionBlock::SIZE;
-         size_t recordSize =
-            (messageLength > prefixLength) ? messageLength - prefixLength : 0;
+    p->descriptionBlock_ = std::make_shared<ProductDescriptionBlock>();
+    dataValid = p->descriptionBlock_->Parse(is);
 
-         boost::iostreams::filtering_streambuf<boost::iostreams::input> in;
-         util::rangebuf r(is.rdbuf(), recordSize);
-         in.push(boost::iostreams::bzip2_decompressor());
-         in.push(r);
+    if (dataValid && p->descriptionBlock_->IsCompressionEnabled())
+    {
+        size_t messageLength = header().length_of_message();
+        size_t prefixLength = Level3MessageHeader::SIZE + ProductDescriptionBlock::SIZE;
+        size_t recordSize = (messageLength > prefixLength) ? messageLength - prefixLength : 0;
 
-         try
-         {
-            std::stringstream ss;
-            std::streamsize   bytesCopied = boost::iostreams::copy(in, ss);
-            logger_->trace("Decompressed data size = {} bytes", bytesCopied);
+        // Lambda to attempt decompression with a specific decompressor
+        auto tryDecompress = [&](auto decompressor) -> bool {
+            try {
+                boost::iostreams::filtering_streambuf<boost::iostreams::input> in;
+                util::rangebuf r(is.rdbuf(), recordSize);
+                in.push(decompressor);
+                in.push(r);
 
-            dataValid = p->LoadBlocks(ss);
-         }
-         catch (const boost::iostreams::bzip2_error& ex)
-         {
-            logger_->warn("Error decompressing data: {}", ex.what());
+                std::stringstream ss;
+                boost::iostreams::copy(in, ss);
+                return p->LoadBlocks(ss);
+            } catch (...) {
+                return false;
+            }
+        };
 
-            dataValid = false;
-         }
-      }
-      else
-      {
-         dataValid = p->LoadBlocks(is);
-      }
-   }
+        // Try Zlib/Gzip first (based on your '78 da' finding), then Bzip2
+        is.seekg(dataStart + (std::streampos)prefixLength);
+        if (tryDecompress(boost::iostreams::zlib_decompressor())) {
+            logger_->info("Successfully decompressed using Zlib/Gzip.");
+        } 
+        else {
+            logger_->info("Zlib failed, attempting Bzip2 fallback...");
+            is.seekg(dataStart + (std::streampos)prefixLength); // Reset stream
+            if (tryDecompress(boost::iostreams::bzip2_decompressor())) {
+                logger_->info("Successfully decompressed using Bzip2.");
+            } else {
+                logger_->error("Decompression failed for both Zlib and Bzip2.");
+                dataValid = false;
+            }
+        }
+    }
+    else if (dataValid)
+    {
+        dataValid = p->LoadBlocks(is);
+    }
 
-   const std::streampos dataEnd = is.tellg();
-   if (!ValidateMessage(is, dataEnd - dataStart))
-   {
-      dataValid = false;
-   }
+    const std::streampos dataEnd = is.tellg();
+    if (!ValidateMessage(is, dataEnd - dataStart))
+    {
+        dataValid = false;
+    }
 
-   return dataValid;
+    return dataValid;
 }
 
 bool GraphicProductMessageImpl::LoadBlocks(std::istream& is)
