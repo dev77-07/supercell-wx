@@ -3,6 +3,7 @@
 #include <scwx/provider/aws_level2_chunks_data_provider.hpp>
 #include <scwx/provider/aws_level3_data_provider.hpp>
 #include <scwx/provider/ondas_level2_data_provider.hpp>
+#include <scwx/provider/ondas_level3_data_provider.hpp>
 #include <scwx/util/environment.hpp>
 #include <scwx/util/logger.hpp>
 
