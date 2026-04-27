@@ -47,7 +47,7 @@ public:
 OndasLevel3DataProvider::OndasLevel3DataProvider(const std::string& radarSite,
                                                  const std::string& product,
                                                  const std::string& baseUri) :
-    HttpNexradDataProvider(radarSite, product, baseUri),
+    HttpNexradDataProvider(radarSite, baseUri),
     p(std::make_unique<Impl>(this, radarSite, product, baseUri))
 {
 }
