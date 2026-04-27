@@ -136,8 +136,7 @@ jobs:
         cmake ../source/ `
           -G Ninja `
           -DCMAKE_BUILD_TYPE="${{ matrix.build_type }}" `
-          -DCMAKE_CXX_FLAGS="/FS" `
-          -DCMAKE_C_FLAGS="/FS" `
+          -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" `
           -DCMAKE_C_COMPILER_LAUNCHER=sccache `
           -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
           -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="${{ github.workspace }}/source/external/cmake-conan/conan_provider.cmake" `
