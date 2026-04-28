@@ -123,23 +123,19 @@ jobs:
 
     - name: Build Supercell Wx
       shell: pwsh
+      env:
+        # This variable is picked up by cl.exe directly.
+        # It forces /Z7 (Embedded) and /FS (Synchronous Writes) 
+        # to be the final word for every compilation.
+        _CL_: "/Z7 /FS"
       run: |
         sccache --start-server
-        
-        # Create a rule override file to force /Z7 and strip /Zi
-        $OverrideFile = "${{ github.workspace }}\msvc_override.cmake"
-        @"
-        set(CMAKE_CXX_FLAGS_RELEASE_INIT "/O2 /Ob2 /DNDEBUG /Z7 /FS" CACHE STRING "" FORCE)
-        set(CMAKE_C_FLAGS_RELEASE_INIT "/O2 /Ob2 /DNDEBUG /Z7 /FS" CACHE STRING "" FORCE)
-        "@ | Out-File -FilePath $OverrideFile -Encoding utf8
-
         if (-not (Test-Path build)) { mkdir build }
         cd build
         
         cmake ../source/ `
           -G Ninja `
           -DCMAKE_BUILD_TYPE="Release" `
-          -DCMAKE_USER_MAKE_RULES_OVERRIDE="$OverrideFile" `
           -DCMAKE_POLICY_DEFAULT_CMP0141=NEW `
           -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" `
           -DCMAKE_C_COMPILER_LAUNCHER=sccache `
