@@ -327,20 +327,37 @@ void HttpNexradDataProvider::Impl::UpdateMetadata()
 {
    std::shared_lock lock(objectsMutex_);
 
+   // 1. Always update lastModified_ if possible
    if (!objects_.empty())
    {
       lastModified_ = objects_.crbegin()->second.lastModified_;
    }
 
+   // 2. ONLY calculate updatePeriod_ if we have at least 2 objects
+   // AND the time difference is actually positive.
    if (objects_.size() >= 2)
    {
       auto it = objects_.crbegin();
       auto lastModified = it->second.lastModified_;
-      auto prevModified = (++it)->second.lastModified_;
+      
+      // Safe move to the second to last element
+      auto next = std::next(it);
+      auto prevModified = next->second.lastModified_;
+      
       auto delta = lastModified - prevModified;
 
-      updatePeriod_ = std::chrono::duration_cast<std::chrono::seconds>(delta);
-      logger_->debug("Updated metadata: period = {}s", updatePeriod_.count());
+      // Ensure we don't set a zero-second or negative period
+      if (delta > std::chrono::seconds(0))
+      {
+         updatePeriod_ = std::chrono::duration_cast<std::chrono::seconds>(delta);
+         logger_->debug("Updated metadata: period = {}s", updatePeriod_.count());
+      }
+   }
+   else
+   {
+      // Fallback: If we don't have enough data to calculate a period, 
+      // set a default safe poll rate (e.g., 5 minutes)
+      updatePeriod_ = std::chrono::minutes(5);
    }
 }
 
