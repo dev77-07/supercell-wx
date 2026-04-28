@@ -25,8 +25,6 @@ jobs:
             env_cc: ''
             env_cxx: ''
             compiler: msvc
-            cppflags: ''
-            ldflags: ''
             vs_arch: x64
             vs_version: 2022
             qt_version: 6.11.0
@@ -43,7 +41,6 @@ jobs:
       CC: ${{ matrix.env_cc }}
       CXX: ${{ matrix.env_cxx }}
       SCWX_VERSION: v0.5.6
-      # Tells sccache where to store its data on Windows
       SCCACHE_DIR: ${{ github.workspace }}\.sccache
 
     runs-on: ${{ matrix.os }}
@@ -69,7 +66,6 @@ jobs:
       run: |
         pip install geopandas GitPython conan sccache
 
-    # Cache the Qt installation folder
     - name: Cache Qt
       id: cache-qt
       uses: actions/cache@v4
@@ -96,14 +92,12 @@ jobs:
         $ErrorActionPreference = 'Stop'
         $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
         $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-        if (-not $vsPath) { throw "Visual Studio not found" }
         $vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
         $arch = if ("${{ matrix.vs_arch }}" -eq "x64") { "amd64" } else { "${{ matrix.vs_arch }}" }
         cmd.exe /d /s /c """$vsDevCmd"" -arch=$arch -host_arch=$arch && set" | ForEach-Object {
           if ($_ -match "^(.*?)=(.*)$") { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
         }
 
-    # Cache for sccache (compiler output)
     - name: sccache Cache
       uses: actions/cache@v4
       with:
@@ -129,26 +123,27 @@ jobs:
 
     - name: Build Supercell Wx
       shell: pwsh
-      env:
-        # This forces every single call to cl.exe to use /Z7 and /FS
-        # regardless of what the CMake files say.
-        _CL_: "/Z7 /FS"
       run: |
-        # Start sccache server
         sccache --start-server
+        if (-not (Test-Path build)) { mkdir build }
         cd build
+        
+        # KEY CHANGES: Force /Z7 and /FS globally to satisfy sccache
         cmake ../source/ `
           -G Ninja `
-          -DCMAKE_BUILD_TYPE="${{ matrix.build_type }}" `
+          -DCMAKE_BUILD_TYPE="Release" `
+          -DCMAKE_POLICY_DEFAULT_CMP0141=NEW `
           -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" `
+          -DCMAKE_CXX_FLAGS_RELEASE="/O2 /Ob2 /DNDEBUG /Z7 /FS" `
+          -DCMAKE_C_FLAGS_RELEASE="/O2 /Ob2 /DNDEBUG /Z7 /FS" `
           -DCMAKE_C_COMPILER_LAUNCHER=sccache `
           -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
           -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="${{ github.workspace }}/source/external/cmake-conan/conan_provider.cmake" `
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/supercell-wx" `
           -DCONAN_HOST_PROFILE="${{ matrix.conan_profile }}" `
           -DCONAN_BUILD_PROFILE="${{ matrix.conan_profile }}"
+        
         ninja supercell-wx wxtest
-        # Show stats to verify cache hits in the logs
         sccache --show-stats
 
     - name: Install Supercell Wx
