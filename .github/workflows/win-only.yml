@@ -129,6 +129,10 @@ jobs:
 
     - name: Build Supercell Wx
       shell: pwsh
+      env:
+        # This forces every single call to cl.exe to use /Z7 and /FS
+        # regardless of what the CMake files say.
+        _CL_: "/Z7 /FS"
       run: |
         # Start sccache server
         sccache --start-server
