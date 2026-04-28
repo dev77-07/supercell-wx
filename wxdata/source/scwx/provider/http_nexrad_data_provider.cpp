@@ -25,7 +25,7 @@ class HttpNexradDataProvider::Impl
 public:
    struct ObjectRecord
    {
-      std::string                         key_;
+      std::string                           key_;
       std::chrono::system_clock::time_point lastModified_;
    };
 
@@ -44,9 +44,8 @@ public:
    Impl& operator=(const Impl&&) = delete;
 
    void CheckDataPresent(std::chrono::system_clock::time_point date,
-                         bool                                   update);
+                         bool                                  update);
    void UpdateObjectDates(std::chrono::system_clock::time_point date);
-   void UpdateMetadata();
 
    HttpNexradDataProvider* self_;
 
@@ -58,11 +57,11 @@ public:
 
    std::map<std::chrono::system_clock::time_point, ObjectRecord> objects_ {};
    std::map<std::chrono::system_clock::time_point, ObjectRecord> newObjects_ {};
-   std::shared_mutex                                    objectsMutex_ {};
+   std::shared_mutex                                objectsMutex_ {};
    std::list<std::chrono::system_clock::time_point> objectDates_ {};
    std::atomic<bool>                                cacheResetting_ {false};
 
-   std::mutex              refreshMutex_ {};
+   std::mutex                            refreshMutex_ {};
    std::chrono::system_clock::time_point refreshDate_ {};
    std::chrono::system_clock::time_point lastModified_ {};
    std::chrono::seconds                  updatePeriod_ {};
@@ -154,14 +153,17 @@ HttpNexradDataProvider::GetTimePointsByDate(
 
    std::shared_lock lock(p->objectsMutex_);
 
+   // Determine objects to retrieve
    const auto objectsBegin = p->objects_.lower_bound(day);
    const auto objectsEnd = p->objects_.lower_bound(day + std::chrono::days {1});
 
+   // Copy time points to destination vector
    std::transform(objectsBegin,
                   objectsEnd,
                   std::back_inserter(timePoints),
                   [](const auto& object) { return object.first; });
 
+   // Unlock mutex, finished
    lock.unlock();
 
    return timePoints;
@@ -175,13 +177,14 @@ bool HttpNexradDataProvider::IsDateArchiveAvailable() const
 bool HttpNexradDataProvider::IsDateCached(
    std::chrono::system_clock::time_point date)
 {
-   const auto day       = std::chrono::floor<std::chrono::days>(date);
+   const auto day         = std::chrono::floor<std::chrono::days>(date);
    bool       dataPresent = false;
 
    const std::shared_lock lock(p->objectsMutex_);
 
    if (p->dateArchiveAvailable_)
    {
+      // Is the date present in the date list?
       const auto currentDateIterator =
          std::find(p->objectDates_.cbegin(), p->objectDates_.cend(), day);
 
@@ -189,6 +192,7 @@ bool HttpNexradDataProvider::IsDateCached(
    }
    else
    {
+      // Is data present?
       dataPresent = p->dataRefreshed_;
    }
 
@@ -206,6 +210,7 @@ HttpNexradDataProvider::LoadObjectByKey(const std::string& key)
    const std::string fileUrl = GetFileUrl(key);
    std::stringstream ss      = DownloadToStream(fileUrl);
 
+   // If the file is empty, return nullptr
    ss.seekg(0, std::ios::end);
    if (ss.tellg() == 0)
    {
@@ -243,12 +248,14 @@ std::pair<size_t, size_t> HttpNexradDataProvider::Refresh()
    std::size_t allNewObjects   = 0;
    std::size_t allTotalObjects = 0;
 
+   // If we haven't gotten any objects from today, first list objects for
+   // yesterday, to ensure we haven't missed any objects near midnight
    if (p->refreshDate_ < today && p->dateArchiveAvailable_)
    {
-      const auto yesterday                        = today - days {1};
+      const auto yesterday                           = today - days {1};
       const auto [success, newObjects, totalObjects] = ListObjects(yesterday);
-      allNewObjects                                   = newObjects;
-      allTotalObjects                                 = totalObjects;
+      allNewObjects                                  = newObjects;
+      allTotalObjects                                = totalObjects;
       if (totalObjects > 0)
       {
          p->refreshDate_ = yesterday;
@@ -263,7 +270,6 @@ std::pair<size_t, size_t> HttpNexradDataProvider::Refresh()
       p->refreshDate_ = today;
    }
 
-   p->UpdateMetadata();
    return std::make_pair(allNewObjects, allTotalObjects);
 }
 
@@ -276,6 +282,7 @@ void HttpNexradDataProvider::Impl::CheckDataPresent(
    {
       std::shared_lock lock(objectsMutex_);
 
+      // Is the date present in the date list?
       const auto currentDateIterator = std::ranges::find(objectDates_, day);
       if (currentDateIterator == objectDates_.cend())
       {
@@ -283,6 +290,7 @@ void HttpNexradDataProvider::Impl::CheckDataPresent(
 
          if (update)
          {
+            // List objects, since the date is not present in the date list
             const auto [success, newObjects, totalObjects] =
                self_->ListObjects(date);
             if (success)
@@ -294,6 +302,9 @@ void HttpNexradDataProvider::Impl::CheckDataPresent(
       else
       {
          lock.unlock();
+
+         // If we haven't updated the most recently queried dates yet, because
+         // the date was already cached, update
          UpdateObjectDates(date);
       }
    }
@@ -303,9 +314,12 @@ void HttpNexradDataProvider::Impl::CheckDataPresent(
       {
          std::shared_lock lock(objectsMutex_);
 
+         // Is data present?
          if (objects_.empty())
          {
             lock.unlock();
+
+            // List objects, since no data is present
             self_->ListObjects(date);
          }
       }
@@ -319,46 +333,9 @@ void HttpNexradDataProvider::Impl::UpdateObjectDates(
 
    std::unique_lock lock(objectsMutex_);
 
+   // Remove any existing occurrences of day, and add to the back of the list
    objectDates_.remove(day);
    objectDates_.emplace_back(day);
-}
-
-void HttpNexradDataProvider::Impl::UpdateMetadata()
-{
-   std::shared_lock lock(objectsMutex_);
-
-   // 1. Always update lastModified_ if possible
-   if (!objects_.empty())
-   {
-      lastModified_ = objects_.crbegin()->second.lastModified_;
-   }
-
-   // 2. ONLY calculate updatePeriod_ if we have at least 2 objects
-   // AND the time difference is actually positive.
-   if (objects_.size() >= 2)
-   {
-      auto it = objects_.crbegin();
-      auto lastModified = it->second.lastModified_;
-      
-      // Safe move to the second to last element
-      auto next = std::next(it);
-      auto prevModified = next->second.lastModified_;
-      
-      auto delta = lastModified - prevModified;
-
-      // Ensure we don't set a zero-second or negative period
-      if (delta > std::chrono::seconds(0))
-      {
-         updatePeriod_ = std::chrono::duration_cast<std::chrono::seconds>(delta);
-         logger_->debug("Updated metadata: period = {}s", updatePeriod_.count());
-      }
-   }
-   else
-   {
-      // Fallback: If we don't have enough data to calculate a period, 
-      // set a default safe poll rate (e.g., 5 minutes)
-      updatePeriod_ = std::chrono::minutes(5);
-   }
 }
 
 void HttpNexradDataProvider::Shutdown() noexcept
@@ -368,6 +345,7 @@ void HttpNexradDataProvider::Shutdown() noexcept
 
 std::string HttpNexradDataProvider::DownloadToString(const std::string& url)
 {
+   // Use CPR to download file
    ::cpr::Response response =
       ::cpr::Get(::cpr::Url {url},
                  network::cpr::GetHeader(),
@@ -391,6 +369,7 @@ std::string HttpNexradDataProvider::DownloadToString(const std::string& url)
 std::stringstream
 HttpNexradDataProvider::DownloadToStream(const std::string& url)
 {
+   // Convert response to stream
    std::stringstream ss {DownloadToString(url),
                          std::ios::in | std::ios::binary};
    return ss;
@@ -436,7 +415,6 @@ void HttpNexradDataProvider::ResetCacheFinish()
       p->objects_ = std::move(p->newObjects_);
       p->newObjects_.clear();
       p->dataRefreshed_ = true;
-      p->UpdateMetadata(); // Added update trigger
    }
 
    p->cacheResetting_ = false;
