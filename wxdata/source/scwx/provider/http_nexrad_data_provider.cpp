@@ -273,6 +273,26 @@ std::pair<size_t, size_t> HttpNexradDataProvider::Refresh()
    return std::make_pair(allNewObjects, allTotalObjects);
 }
 
+void HttpNexradDataProvider::Impl::UpdateMetadata()
+{
+    std::shared_lock lock(objectsMutex_);
+
+    if (!objects_.empty())
+    {
+        lastModified_ = objects_.crbegin()->second.lastModified_;
+    }
+
+    if (objects_.size() >= 2)
+    {
+        auto it           = objects_.crbegin();
+        auto lastModified = it->second.lastModified_;
+        auto prevModified = (++it)->second.lastModified_;
+        auto delta        = lastModified - prevModified;
+
+        updatePeriod_ = std::chrono::duration_cast<std::chrono::seconds>(delta);
+    }
+}
+
 void HttpNexradDataProvider::Impl::CheckDataPresent(
    std::chrono::system_clock::time_point date, bool update)
 {
