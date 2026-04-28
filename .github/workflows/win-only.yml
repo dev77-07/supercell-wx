@@ -1,411 +1,206 @@
 name: win-only
 
-
-
 on:
-
   workflow_dispatch:
-
   push:
-
     branches:
-
       - 'develop'
-
   pull_request:
-
     branches:
-
       - 'develop'
-
-
 
 concurrency:
-
   # Cancel in-progress jobs for the same pull request
-
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-
   cancel-in-progress: true
 
-
-
 jobs:
-
   build:
-
     strategy:
-
       fail-fast: false
-
       matrix:
-
         include:
-
           - name: windows_vs2022_x64
-
             os: windows-2022
-
             build_type: Release
-
             env_cc: ''
-
             env_cxx: ''
-
             compiler: msvc
-
             cppflags: ''
-
             ldflags: ''
-
             vs_arch: x64
-
             vs_version: 2022
-
             qt_version: 6.11.0
-
             qt_arch_aqt: win64_msvc2022_64
-
             qt_arch_dir: msvc2022_64
-
             qt_modules: qtimageformats qtmultimedia qtpositioning qtserialport
-
             qt_tools: ''
-
             conan_package_manager: ''
-
             conan_profile: scwx-windows_vs2022_x64
-
             appimage_arch: ''
-
             artifact_suffix: windows-vs2022-x64
 
-
-
     name: ${{ matrix.name }}
-
     env:
-
       CC: ${{ matrix.env_cc }}
-
       CXX: ${{ matrix.env_cxx }}
-
       SCWX_VERSION: v0.5.6
-
     runs-on: ${{ matrix.os }}
 
-
-
     steps:
-
     - name: Setup
-
       run: git config --global core.longpaths true
 
-
-
     - name: Checkout
-
       uses: actions/checkout@v6
-
       with:
-
         path: source
-
         submodules: recursive
 
-
-
     - name: Install Qt
-
       uses: jdpurcell/install-qt-action@v5
-
       env:
-
         AQT_CONFIG: ${{ github.workspace }}/source/tools/aqt-settings.ini
-
       with:
-
         version: ${{ matrix.qt_version }}
-
         arch: ${{ matrix.qt_arch_aqt }}
-
         modules: ${{ matrix.qt_modules }}
-
         tools: ${{ matrix.qt_tools }}
-
         aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
 
-
-
     - name: Setup MSVC
-
       if: matrix.compiler == 'msvc'
-
       shell: pwsh
-
       run: |
-
         $ErrorActionPreference = 'Stop'
-
         $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-
         $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-
         if (-not $vsPath) { throw "Visual Studio with C++ tools not found" }
 
-
-
         $vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
-
         if (-not (Test-Path $vsDevCmd)) { throw "VsDevCmd not found at $vsDevCmd" }
-
-
 
         $arch = if ("${{ matrix.vs_arch }}" -eq "x64") { "amd64" } else { "${{ matrix.vs_arch }}" }
 
-
-
         cmd.exe /d /s /c """$vsDevCmd"" -arch=$arch -host_arch=$arch && set" |
-
           ForEach-Object {
-
             if ($_ -match "^(.*?)=(.*)$") {
-
               "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
             }
-
           }
 
-
-
     - name: Setup Python Environment
-
       shell: pwsh
-
       run: |
-
         pip install geopandas `
-
                     GitPython `
-
                     conan
 
-
-
     - name: Cache Conan Packages
-
       uses: actions/cache@v5
-
       with:
-
         path: ~/.conan2
-
         key: build-v2-${{ matrix.conan_profile }}-${{ hashFiles('./source/conanfile.py', './source/tools/conan/profiles/*') }}
 
-
-
     - name: Install Conan Packages
-
       shell: pwsh
-
       run: |
-
         conan config install `
-
           ./source/tools/conan/profiles/${{ matrix.conan_profile }} `
-
           -tf profiles
-
         mkdir build
-
         cd build
-
         mkdir conan
-
         conan install ../source/ `
-
           --remote conancenter `
-
           --build missing `
-
           --profile:all ${{ matrix.conan_profile }} `
-
           --settings:all build_type=${{ matrix.build_type }} `
-
           --output-folder ./conan/ `
-
           ${{ matrix.conan_package_manager }}
-
         conan cache clean
 
-
-
     - name: Build Supercell Wx
-
       shell: pwsh
-
       run: |
-
         cd build
-
         cmake ../source/ `
-
           -G Ninja `
-
           -DCMAKE_BUILD_TYPE="${{ matrix.build_type }}" `
-
           -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="${{ github.workspace }}/source/external/cmake-conan/conan_provider.cmake" `
-
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/supercell-wx" `
-
           -DCONAN_HOST_PROFILE="${{ matrix.conan_profile }}" `
-
           -DCONAN_BUILD_PROFILE="${{ matrix.conan_profile }}"
-
         ninja supercell-wx wxtest
 
-
-
     - name: Install Supercell Wx
-
       shell: pwsh
-
       run: |
-
         cd build
-
         cmake --install . --component supercell-wx
 
-
-
     - name: Collect Artifacts
-
       if: ${{ startsWith(matrix.os, 'ubuntu') }}
-
       shell: bash
-
       run: |
-
         pushd supercell-wx/
-
         cd lib/
-
         ln -s libssl.so.3 libssl.so
-
         rm -f libGLX.so*
-
         rm -f libOpenGL.so*
-
         cp -p ${RUNNER_WORKSPACE}/Qt/${{ matrix.qt_version }}/${{ matrix.qt_arch_dir }}/lib/libQt6WaylandClient.so* .
-
         cd ..
-
         mkdir -p plugins/
-
         cd plugins/
-
         mkdir -p sqldrivers/
-
         cp -p "${RUNNER_WORKSPACE}/Qt/${{ matrix.qt_version }}/${{ matrix.qt_arch_dir }}/plugins/sqldrivers/libqsqlite.so" sqldrivers/
-
         mkdir -p platforms/
-
         cp -p "${RUNNER_WORKSPACE}/Qt/${{ matrix.qt_version }}/${{ matrix.qt_arch_dir }}/plugins/platforms/libqwayland.so" platforms/
-
         cp -rp "${RUNNER_WORKSPACE}/Qt/${{ matrix.qt_version }}/${{ matrix.qt_arch_dir }}/plugins/wayland-decoration-client" .
-
         cp -rp "${RUNNER_WORKSPACE}/Qt/${{ matrix.qt_version }}/${{ matrix.qt_arch_dir }}/plugins/wayland-graphics-integration-client" .
-
         cp -rp "${RUNNER_WORKSPACE}/Qt/${{ matrix.qt_version }}/${{ matrix.qt_arch_dir }}/plugins/wayland-shell-integration" .
-
         cd ..
-
         popd
-
         tar -czf supercell-wx-${{ matrix.artifact_suffix }}.tar.gz supercell-wx/
 
-
-
     - name: Upload Artifacts (Windows)
-
       if: ${{ startsWith(matrix.os, 'windows') }}
-
       uses: actions/upload-artifact@v7
-
       with:
-
         name: supercell-wx-${{ matrix.artifact_suffix }}
-
         path: ${{ github.workspace }}/supercell-wx/
 
-
-
     - name: Upload Debug Artifacts (Windows)
-
       if: ${{ startsWith(matrix.os, 'windows') }}
-
       uses: actions/upload-artifact@v7
-
       with:
-
         name: supercell-wx-debug-${{ matrix.artifact_suffix }}
-
         path: ${{ github.workspace }}/build/Release/bin/*.pdb
 
-
-
     - name: Build Installer (Windows)
-
       if: ${{ startsWith(matrix.os, 'windows') }}
-
       shell: pwsh
-
       run: |
-
         cd build
-
         cpack
 
-
-
     - name: Upload Installer (Windows)
-
       if: ${{ startsWith(matrix.os, 'windows') }}
-
       uses: actions/upload-artifact@v7
-
       with:
-
         name: supercell-wx-installer-${{ matrix.artifact_suffix }}
-
         path: ${{ github.workspace }}/build/supercell-wx-*.msi*
 
-
-
     - name: Test Supercell Wx
-
       working-directory: ${{ github.workspace }}/build
-
       env:
-
         MAPBOX_API_KEY:   ${{ secrets.MAPBOX_API_KEY }}
-
         MAPTILER_API_KEY: ${{ secrets.MAPTILER_API_KEY }}
-
       run: ctest -C ${{ matrix.build_type }} --exclude-regex "test_mln.*|NtpClient.*|UpdateManager.*"
 
-
-
     - name: Upload Test Logs
-
       if: ${{ !cancelled() }}
-
       uses: actions/upload-artifact@v7
-
       with:
-
         name: supercell-wx-test-logs-${{ matrix.name }}
-
         path: ${{ github.workspace }}/build/Testing/
