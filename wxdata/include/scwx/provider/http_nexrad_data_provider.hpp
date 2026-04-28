@@ -39,6 +39,11 @@ public:
    std::shared_ptr<wsr88d::NexradFile>
    LoadObjectByTime(std::chrono::system_clock::time_point time) override;
 
+   // List and parse directory, add to cache. Returns (success, newObjects,
+   // totalObjects)
+   std::tuple<bool, std::size_t, std::size_t>
+   ListObjects(std::chrono::system_clock::time_point date) override = 0;
+
    std::pair<size_t, size_t> Refresh() override;
    void                      Shutdown() noexcept override;
 
@@ -51,11 +56,6 @@ protected:
    virtual std::string
    GetListingUrl(std::chrono::system_clock::time_point date) = 0;
    virtual std::string GetFileUrl(const std::string& key)    = 0;
-
-   // List and parse directory, add to cache. Returns (success, newObjects,
-   // totalObjects)
-   std::tuple<bool, std::size_t, std::size_t>
-   ListObjects(std::chrono::system_clock::time_point date) override = 0;
 
    // Access to internal state for derived classes
    bool               AddToCache(std::chrono::system_clock::time_point time,
