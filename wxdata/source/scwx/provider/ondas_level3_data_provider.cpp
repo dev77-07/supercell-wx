@@ -15,6 +15,9 @@ static const std::string logPrefix_ =
    "scwx::provider::ondas_level3_data_provider";
 static const auto logger_ = util::Logger::Create(logPrefix_);
 
+static std::unordered_map<std::string, std::vector<std::string>> productMap_;
+static std::shared_mutex                                         productMutex_;
+
 class OndasLevel3DataProvider::Impl
 {
 public:
