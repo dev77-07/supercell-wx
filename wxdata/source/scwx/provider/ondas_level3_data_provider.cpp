@@ -16,7 +16,6 @@ static const std::string logPrefix_ =
 static const auto logger_ = util::Logger::Create(logPrefix_);
 
 static std::unordered_map<std::string, std::vector<std::string>> productMap_;
-static std::shared_mutex                                         productMutex_;
 
 class OndasLevel3DataProvider::Impl
 {
