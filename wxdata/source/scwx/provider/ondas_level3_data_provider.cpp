@@ -30,6 +30,8 @@ public:
    }
    ~Impl() = default;
 
+   void ListProducts();
+
    Impl(const Impl&)             = delete;
    Impl& operator=(const Impl&)  = delete;
    Impl(const Impl&&)            = delete;
