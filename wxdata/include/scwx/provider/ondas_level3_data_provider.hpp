@@ -25,6 +25,9 @@ public:
    static std::chrono::system_clock::time_point
    GetTimePointFromKey(const std::string& key);
 
+   void                     RequestAvailableProducts();
+   std::vector<std::string> GetAvailableProducts();
+
    std::tuple<bool, size_t, size_t>
    ListObjects(std::chrono::system_clock::time_point date) override;
 
