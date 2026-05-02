@@ -172,4 +172,33 @@ std::string OndasLevel3DataProvider::GetFileUrl(const std::string& key)
    return fmt::format("{0}/{1}/{2}/{3}", p->baseUri_, p->radarSite_, p->product_, key);
 }
 
+void OndasLevel3DataProvider::RequestAvailableProducts()
+{
+   p->ListProducts();
+}
+
+std::vector<std::string> OndasLevel3DataProvider::GetAvailableProducts()
+{
+   std::shared_lock readLock(productMutex_);
+
+   auto siteProductMap = productMap_.find(p->radarSite_);
+   if (siteProductMap != productMap_.cend())
+   {
+      return siteProductMap->second;
+   }
+
+   return {};
+}
+
+void OndasLevel3DataProvider::Impl::ListProducts()
+{
+   logger_->debug("ListProducts()");
+
+   std::string data = "DAA DHR DOD DPA DPR DSD DSP DTA DU3 DU6 DVL EET HHC N0B N0C N0F N0G N0H N0K N0M N0Q N0R N0S N0U N0V N0X N0Z N1B N1C N1F N1G N1H N1K N1M N1P N1Q N1S N1U N1X N2B N2C N2F N2H N2K N2M N2Q N2S N2U N2X N3B N3C N3F N3H N3K N3M N3P N3Q N3S N3U N3X NAB NAC NAF NAG NAH NAK NAM NAQ NAU NAX NBB NBC NBF NBH NBK NBM NBQ NBU NBX NCR NCZ NET NHI NHL NLA NMD NML NRR NSS NST NSW NTP NTV NVL NVW OHA PTA RCM RSL SPD";
+   std::stringstream ss(data);
+   std::vector<std::string> productList;
+   std::vector<std::string> productList(std::istream_iterator<std::string>{ss},
+                                   std::istream_iterator<std::string>());
+}
+
 } // namespace scwx::provider
