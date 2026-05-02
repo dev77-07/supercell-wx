@@ -216,6 +216,10 @@ void AwsLevel3DataProvider::Impl::ListProducts()
       // Remove extra capacity if necessary
       productList.shrink_to_fit();
 
+      std::string result;
+      for (const auto& str : productList) result += str + " ";
+      logger_->debug(result);
+
       productMap_.emplace(radarSite_, std::move(productList));
    }
 }
