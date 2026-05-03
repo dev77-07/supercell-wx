@@ -200,6 +200,7 @@ void OndasLevel3DataProvider::Impl::ListProducts()
    std::stringstream ss(data);
    std::vector<std::string> productList(std::istream_iterator<std::string>{ss},
                                    std::istream_iterator<std::string>());
+   productMap_.emplace(radarSite_, std::move(productList));
 }
 
 } // namespace scwx::provider
