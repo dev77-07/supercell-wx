@@ -35,6 +35,7 @@ protected:
    std::string
    GetListingUrl(std::chrono::system_clock::time_point date) override;
    std::string GetFileUrl(const std::string& key) override;
+   std::string GetConfigUrl();
 
 private:
    class Impl;

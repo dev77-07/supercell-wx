@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <mutex>
+#include <regex>
 
 #include <re2/re2.h>
 
@@ -176,6 +177,11 @@ std::string OndasLevel3DataProvider::GetFileUrl(const std::string& key)
    return fmt::format("{0}/{1}/{2}/{3}", p->baseUri_, p->radarSite_, p->product_, key);
 }
 
+std::string OndasLevel3DataProvider::GetConfigUrl()
+{
+   return fmt::format("{0}/config.cfg", p->baseUri_);
+}
+
 void OndasLevel3DataProvider::RequestAvailableProducts()
 {
    p->ListProducts();
@@ -196,10 +202,38 @@ void OndasLevel3DataProvider::Impl::ListProducts()
 {
    logger_->debug("ListProducts()");
 
-   std::string data = "DAA DHR DOD DPA DPR DSD DSP DTA DU3 DU6 DVL EET HHC N0B N0C N0F N0G N0H N0K N0M N0Q N0R N0S N0U N0V N0X N0Z N1B N1C N1F N1G N1H N1K N1M N1P N1Q N1S N1U N1X N2B N2C N2F N2H N2K N2M N2Q N2S N2U N2X N3B N3C N3F N3H N3K N3M N3P N3Q N3S N3U N3X NAB NAC NAF NAG NAH NAK NAM NAQ NAU NAX NBB NBC NBF NBH NBK NBM NBQ NBU NBX NCR NCZ NET NHI NHL NLA NMD NML NRR NSS NST NSW NTP NTV NVL NVW OHA PTA RCM RSL SPD";
-   std::stringstream ss(data);
-   std::vector<std::string> productList(std::istream_iterator<std::string>{ss},
-                                   std::istream_iterator<std::string>());
+   const std::string configUrl = self_->GetConfigUrl();
+   std::stringstream ss      = self_->DownloadToStream(configUrl);
+
+   // If the file is empty, return nullptr
+   ss.seekg(0, std::ios::end);
+   if (ss.tellg() == 0)
+   {
+      return;
+   }
+   ss.seekg(0, std::ios::beg);
+
+   //std::string data = "DAA DHR DOD DPA DPR DSD DSP DTA DU3 DU6 DVL EET HHC N0B N0C N0F N0G N0H N0K N0M N0Q N0R N0S N0U N0V N0X N0Z N1B N1C N1F N1G N1H N1K N1M N1P N1Q N1S N1U N1X N2B N2C N2F N2H N2K N2M N2Q N2S N2U N2X N3B N3C N3F N3H N3K N3M N3P N3Q N3S N3U N3X NAB NAC NAF NAG NAH NAK NAM NAQ NAU NAX NBB NBC NBF NBH NBK NBM NBQ NBU NBX NCR NCZ NET NHI NHL NLA NMD NML NRR NSS NST NSW NTP NTV NVL NVW OHA PTA RCM RSL SPD";
+   //std::stringstream ss(data);
+   //std::vector<std::string> productList(std::istream_iterator<std::string>{ss},
+   //                                std::istream_iterator<std::string>());
+   //for (const std::string& prod : productList)
+   //{
+   //   logger_->debug(prod + " ");
+   //}
+
+   std::vector<std::string> productList;
+   std::string              line;
+   const std::regex         re(R"(^\s*Product:\s*([A-Za-z0-9]{3})\b)");
+   std::smatch              m;
+   while (std::getline(ss, line))
+   {
+      if (std::regex_search(line, m, re) && m.size() > 1)
+      {
+         productList.push_back(m[1].str());
+      }
+   }
+
    productMap_.emplace(radarSite_, std::move(productList));
 }
 
